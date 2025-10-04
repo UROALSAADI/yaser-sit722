@@ -18,12 +18,36 @@ jobs:
         with:
           python-version: '3.10'
 
-      - run: |
-          cd backend
+      # Install dependencies for each backend service
+      - name: Install dependencies for customer_service
+        run: |
+          cd backend/customer_service
           pip install -r requirements.txt
 
-      - run: |
-          cd backend
+      - name: Install dependencies for order_service
+        run: |
+          cd backend/order_service
+          pip install -r requirements.txt
+
+      - name: Install dependencies for product_service
+        run: |
+          cd backend/product_service
+          pip install -r requirements.txt
+
+      # Run tests for each service
+      - name: Run tests for customer_service
+        run: |
+          cd backend/customer_service
+          pytest -q
+
+      - name: Run tests for order_service
+        run: |
+          cd backend/order_service
+          pytest -q
+
+      - name: Run tests for product_service
+        run: |
+          cd backend/product_service
           pytest -q
 
   build-and-push:
@@ -41,17 +65,34 @@ jobs:
         with:
           login-server: ${{ env.ACR_NAME }}.azurecr.io
 
+      # Build and push backend Docker images for each service
       - uses: docker/build-push-action@v5
         with:
-          context: ./backend
-          file: ./backend/Dockerfile
+          context: ./backend/customer_service
+          file: ./backend/customer_service/Dockerfile
           push: true
-          tags: ${{ env.ACR_NAME }}.azurecr.io/backend:${{ env.IMAGE_TAG }}
+          tags: ${{ env.ACR_NAME }}.azurecr.io/customer_service:${{ env.IMAGE_TAG }}
 
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./backend/order_service
+          file: ./backend/order_service/Dockerfile
+          push: true
+          tags: ${{ env.ACR_NAME }}.azurecr.io/order_service:${{ env.IMAGE_TAG }}
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./backend/product_service
+          file: ./backend/product_service/Dockerfile
+          push: true
+          tags: ${{ env.ACR_NAME }}.azurecr.io/product_service:${{ env.IMAGE_TAG }}
+
+      # Build and push frontend image
       - uses: docker/build-push-action@v5
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
           tags: ${{ env.ACR_NAME }}.azurecr.io/frontend:${{ env.IMAGE_TAG }}
+
 
