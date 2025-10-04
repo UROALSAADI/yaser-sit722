@@ -12,7 +12,6 @@ jobs:
   test-and-build:
     runs-on: ubuntu-latest
 
-    # Temporary PostgreSQL for testing database connections
     services:
       postgres:
         image: postgres:15
@@ -29,21 +28,19 @@ jobs:
           --health-retries 5
 
     steps:
-      # 1. Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Setup Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # 3. Set DATABASE_URL for tests
+      # Set DATABASE_URL for tests
       - name: Set DATABASE_URL
         run: echo "DATABASE_URL=postgresql://testuser:testpass@localhost:5432/testdb" >> $GITHUB_ENV
 
-      # 4. Install dependencies for each service
+      # Install dependencies
       - name: Install dependencies - customer_service
         run: |
           cd backend/customer_service
@@ -64,23 +61,26 @@ jobs:
           cd frontend
           pip install -r requirements-dev.txt || echo "No requirements-dev.txt for frontend"
 
-      # 5. Run tests for each service
+      # Run tests for each backend service
       - name: Test customer_service
         run: |
           cd backend/customer_service
+          export DATABASE_URL=$DATABASE_URL
           pytest -q
 
       - name: Test order_service
         run: |
           cd backend/order_service
+          export DATABASE_URL=$DATABASE_URL
           pytest -q
 
       - name: Test product_service
         run: |
           cd backend/product_service
+          export DATABASE_URL=$DATABASE_URL
           pytest -q
 
-      # 6. Build and push Docker images (only if all tests pass)
+      # Build and push Docker images (only if tests pass)
       - name: Azure login
         uses: azure/login@v2
         with:
