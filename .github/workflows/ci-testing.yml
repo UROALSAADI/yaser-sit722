@@ -9,8 +9,10 @@ env:
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  test-backend:
+  test-and-build:
     runs-on: ubuntu-latest
+
+    # Temporary PostgreSQL for testing database connections
     services:
       postgres:
         image: postgres:15
@@ -27,28 +29,21 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Checkout code
+      # 1. Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Setup Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # Set DATABASE_URL for tests
+      # 3. Set DATABASE_URL for tests
       - name: Set DATABASE_URL
         run: echo "DATABASE_URL=postgresql://testuser:testpass@localhost:5432/testdb" >> $GITHUB_ENV
 
-      # Wait for PostgreSQL to be ready
-      - name: Wait for PostgreSQL
-        run: |
-          echo "Waiting for PostgreSQL to start..."
-          for i in {1..30}; do
-            pg_isready -h localhost -p 5432 -U testuser && break
-            sleep 2
-          done
-
-      # Install dependencies for each service
+      # 4. Install dependencies for each service
       - name: Install dependencies - customer_service
         run: |
           cd backend/customer_service
@@ -64,7 +59,12 @@ jobs:
           cd backend/product_service
           pip install -r requirements-dev.txt
 
-      # Run tests for each service
+      - name: Install dependencies - frontend
+        run: |
+          cd frontend
+          pip install -r requirements-dev.txt || echo "No requirements-dev.txt for frontend"
+
+      # 5. Run tests for each service
       - name: Test customer_service
         run: |
           cd backend/customer_service
@@ -80,15 +80,7 @@ jobs:
           cd backend/product_service
           pytest -q
 
-  build-and-push:
-    runs-on: ubuntu-latest
-    needs: test-backend
-    if: success()  # Only run if tests pass
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # Login to Azure
+      # 6. Build and push Docker images (only if all tests pass)
       - name: Azure login
         uses: azure/login@v2
         with:
@@ -99,30 +91,32 @@ jobs:
         with:
           login-server: ${{ env.ACR_NAME }}.azurecr.io
 
-      # Build and push backend Docker images
-      - uses: docker/build-push-action@v5
+      - name: Build and push customer_service image
+        uses: docker/build-push-action@v5
         with:
           context: ./backend/customer_service
           file: ./backend/customer_service/Dockerfile
           push: true
           tags: ${{ env.ACR_NAME }}.azurecr.io/customer_service:${{ env.IMAGE_TAG }}
 
-      - uses: docker/build-push-action@v5
+      - name: Build and push order_service image
+        uses: docker/build-push-action@v5
         with:
           context: ./backend/order_service
           file: ./backend/order_service/Dockerfile
           push: true
           tags: ${{ env.ACR_NAME }}.azurecr.io/order_service:${{ env.IMAGE_TAG }}
 
-      - uses: docker/build-push-action@v5
+      - name: Build and push product_service image
+        uses: docker/build-push-action@v5
         with:
           context: ./backend/product_service
           file: ./backend/product_service/Dockerfile
           push: true
           tags: ${{ env.ACR_NAME }}.azurecr.io/product_service:${{ env.IMAGE_TAG }}
 
-      # Build and push frontend Docker image
-      - uses: docker/build-push-action@v5
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
