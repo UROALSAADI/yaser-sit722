@@ -35,9 +35,18 @@ jobs:
         with:
           python-version: '3.10'
 
-      # Make DATABASE_URL available to tests
+      # Set DATABASE_URL for tests
       - name: Set DATABASE_URL
         run: echo "DATABASE_URL=postgresql://testuser:testpass@localhost:5432/testdb" >> $GITHUB_ENV
+
+      # Wait for PostgreSQL to be ready
+      - name: Wait for PostgreSQL
+        run: |
+          echo "Waiting for PostgreSQL to start..."
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 -U testuser && break
+            sleep 2
+          done
 
       # Install dependencies for each service
       - name: Install dependencies - customer_service
