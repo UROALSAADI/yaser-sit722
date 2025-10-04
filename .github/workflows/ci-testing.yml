@@ -27,21 +27,19 @@ jobs:
           --health-retries 5
 
     steps:
-      # 1. Checkout the repository
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Setup Python
-      - name: Setup Python 3.10
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # 3. Set DATABASE_URL for the tests
+      # Make DATABASE_URL available to tests
       - name: Set DATABASE_URL
         run: echo "DATABASE_URL=postgresql://testuser:testpass@localhost:5432/testdb" >> $GITHUB_ENV
 
-      # 4. Install dependencies using requirements-dev.txt
+      # Install dependencies for each service
       - name: Install dependencies - customer_service
         run: |
           cd backend/customer_service
@@ -57,7 +55,7 @@ jobs:
           cd backend/product_service
           pip install -r requirements-dev.txt
 
-      # 5. Run tests
+      # Run tests for each service
       - name: Test customer_service
         run: |
           cd backend/customer_service
@@ -76,16 +74,19 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     needs: test-backend
-    if: success()
+    if: success()  # Only run if tests pass
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       # Login to Azure
-      - uses: azure/login@v2
+      - name: Azure login
+        uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - uses: azure/docker-login@v1
+      - name: Login to ACR
+        uses: azure/docker-login@v1
         with:
           login-server: ${{ env.ACR_NAME }}.azurecr.io
 
