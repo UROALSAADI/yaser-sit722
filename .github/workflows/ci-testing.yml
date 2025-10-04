@@ -1,0 +1,57 @@
+name: CI Pipeline - Testing Branch
+
+on:
+  push:
+    branches: [ "testing" ]
+
+env:
+  ACR_NAME: ${{ secrets.ACR_NAME }}
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - run: |
+          cd backend
+          pytest -q
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: test-backend
+    if: success()
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - uses: azure/docker-login@v1
+        with:
+          login-server: ${{ env.ACR_NAME }}.azurecr.io
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ env.ACR_NAME }}.azurecr.io/backend:${{ env.IMAGE_TAG }}
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ env.ACR_NAME }}.azurecr.io/frontend:${{ env.IMAGE_TAG }}
+
