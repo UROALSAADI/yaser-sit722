@@ -11,14 +11,37 @@ env:
 jobs:
   test-backend:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U testuser -d testdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-      - uses: actions/setup-python@v4
+    steps:
+      # 1. Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Setup Python
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # Install dependencies using requirements-dev.txt
+      # 3. Set DATABASE_URL for the tests
+      - name: Set DATABASE_URL
+        run: echo "DATABASE_URL=postgresql://testuser:testpass@localhost:5432/testdb" >> $GITHUB_ENV
+
+      # 4. Install dependencies using requirements-dev.txt
       - name: Install dependencies - customer_service
         run: |
           cd backend/customer_service
@@ -34,7 +57,7 @@ jobs:
           cd backend/product_service
           pip install -r requirements-dev.txt
 
-      # Run tests
+      # 5. Run tests
       - name: Test customer_service
         run: |
           cd backend/customer_service
